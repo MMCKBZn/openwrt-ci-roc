@@ -114,11 +114,6 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: Add custom LuCI app for NSS version
-      run: |
-        mkdir -p $OPENWRT_PATH/package/luci-app-nssinfo
-        cp -r $GITHUB_WORKSPACE/my_packages/luci-app-nssinfo/* $OPENWRT_PATH/package/luci-app-nssinfo/
-
     - name: Load Custom Configuration(加载自定义配置)
       run: |
         chmod +x $DIY_SCRIPT
