@@ -6,6 +6,9 @@ on:
   # schedule:
   #   - cron: 0 20 * * *
 
+permissions:
+  contents: write
+
 env:
   REPO_URL: https://github.com/laipeng668/immortalwrt.git
   REPO_BRANCH: master
@@ -60,6 +63,20 @@ jobs:
         VERSION_KERNEL=$(grep -oP 'LINUX_KERNEL_HASH-\K[0-9]+\.[0-9]+\.[0-9]+' target/linux/generic/kernel-6.12)
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
 
+    # ========== 修复 CPU 使用率检测：强制启用内核调度统计 ==========
+    - name: Enable kernel schedstats for CPU usage fix
+      run: |
+        KERNEL_CFG="$OPENWRT_PATH/target/linux/qualcommax/ipq60xx/config-6.12"
+        if [ -f "$KERNEL_CFG" ]; then
+          echo "CONFIG_SCHEDSTATS=y" >> "$KERNEL_CFG"
+          echo "CONFIG_TASKSTATS=y" >> "$KERNEL_CFG"
+          echo "CONFIG_TASK_DELAY_ACCT=y" >> "$KERNEL_CFG"
+          echo "CONFIG_TASK_IO_ACCOUNTING=y" >> "$KERNEL_CFG"
+          echo "✅ 内核调度统计选项已启用"
+        else
+          echo "⚠️ 警告：未找到内核配置文件 $KERNEL_CFG，CPU 统计可能异常"
+        fi
+
     - name: Generate Variables(生成变量)
       run: |
         cp $CONFIG_FILE $OPENWRT_PATH/.config
@@ -96,7 +113,12 @@ jobs:
         cd $OPENWRT_PATH
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-  
+
+    - name: Add custom LuCI app for NSS version
+      run: |
+        mkdir -p $OPENWRT_PATH/package/luci-app-nssinfo
+        cp -r $GITHUB_WORKSPACE/my_packages/luci-app-nssinfo/* $OPENWRT_PATH/package/luci-app-nssinfo/
+
     - name: Load Custom Configuration(加载自定义配置)
       run: |
         chmod +x $DIY_SCRIPT
@@ -115,7 +137,12 @@ jobs:
       run: |
         cd $OPENWRT_PATH
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        make -j$(nproc) V=s || make -j1 V=s
+        if [ -z "$(find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*.ubi' \) | head -1)" ]; then
+          echo "❌ 错误：未生成任何固件文件！"
+          exit 1
+        fi
+        echo "✅ 固件文件已生成"
         echo "status=success" >> $GITHUB_OUTPUT
         echo "DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
         echo "FILE_DATE=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
@@ -127,16 +154,30 @@ jobs:
     - name: Organize Files(整理文件)
       if: steps.compile.outputs.status == 'success'
       run: |
-        cd $OPENWRT_PATH/bin/targets/*/*
+        cd $OPENWRT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
         cp $OPENWRT_PATH/.config Arthur.Athena.config
         mv config.buildinfo Arthur.Athena.config.buildinfo
         mv immortalwrt-qualcommax-ipq60xx.manifest Arthur.Athena.manifest
-        mv -f $OPENWRT_PATH/bin/packages/*/*/*.apk packages
-        tar -zcf Arthur.Athena.Packages.tar.gz packages
+        mv -f $OPENWRT_PATH/bin/packages/*/*/*.apk packages 2>/dev/null || true
+        tar -zcf Arthur.Athena.Packages.tar.gz packages 2>/dev/null || true
         rm -rf packages feeds.buildinfo version.buildinfo sha256sums profiles.json
         echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
 
-    - name: Upload Firmware To Release(发布固件)
+    - name: Verify Firmware Files Exist(验证固件文件是否存在)
+      if: steps.compile.outputs.status == 'success'
+      run: |
+        echo "=== 检查固件目录 ==="
+        FIRMWARE_DIR="$OPENWRT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET"
+        echo "固件目录: $FIRMWARE_DIR"
+        ls -lah "$FIRMWARE_DIR" || echo "❌ 目录未找到！"
+        echo ""
+        echo "=== 搜索 sysupgrade 文件 ==="
+        find "$OPENWRT_PATH/bin" -name "*sysupgrade*" -type f || echo "❌ 未找到 sysupgrade 文件"
+        echo ""
+        echo "=== 搜索 factory 文件 ==="
+        find "$OPENWRT_PATH/bin" -name "*factory*" -type f || echo "❌ 未找到 factory 文件"
+
+    - name: Create Release and Upload Firmware(创建 Release 并上传固件)
       if: steps.compile.outputs.status == 'success'
       uses: ncipollo/release-action@main
       with:
@@ -144,12 +185,12 @@ jobs:
         allowUpdates: true
         tag: ${{ env.FIRMWARE_TAG }}
         token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: ${{ env.FIRMWARE_PATH }}/*
+        artifacts: "${{ env.FIRMWARE_PATH }}/*sysupgrade*,${{ env.FIRMWARE_PATH }}/*factory*,${{ env.FIRMWARE_PATH }}/Arthur.Athena*"
         body: |
-          **This is OpenWrt Firmware for ${{ env.FIRMWARE_TAG }}**
+          **This is OpenWrt Firmware for JDCloud**
           ### 📒 固件信息
-          - 这是开启全功能NSS的6.12内核固件，默认主题为Aurora；该固件在ImmortalWrt的基础上，添加了额外的软件包cpufreq、ddns、ttyd、upnp、wol、samba4、vlmcsd、aria2、autoreboot、uhttpd、wifischedule、frps、frpc、diskman、hd-idle、banip、acme、arpbind、usb-printer、passwall、openlist、gecoosac、oaf、sqm、wireguard、watchcat、wechatpush、3cat、smartdns（**Taiyi**额外增加了dockerman、gecoosac、lucky），并添加了若干工具，具体详见JDCloud.config(NoWiFi.config)和General.config。
-          - 💻 这是 ${{ env.FIRMWARE_TAG }} 平台使用的 OpenWrt 固件
+          - 这是开启全功能NSS的6.12内核固件，默认主题为Aurora；该仓库fork于laipeng668
+          - 💻 这是 JDCloud 平台使用的 OpenWrt 固件
           - ⚽ 固件源码: ${{ env.REPO_URL }}
           - 💝 源码分支: ${{ env.REPO_BRANCH }}
           - 🌐 默认地址: **192.168.2.1**
@@ -158,23 +199,16 @@ jobs:
           - 固件内核版本：**${{ env.VERSION_KERNEL }}**
           - 固件编译前最后一次➦[主源码](${{ env.REPO_URL }})更新记录
           - ${{ env.VERSION_INFO }}
-
-    - name: Delete Old Cache(删除旧缓存)
-      run: |
-        # 获取缓存列表并删除
-        gh cache list --key ${{ env.SOURCE_REPO }}-${{ env.REPO_BRANCH }}-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}- --json key --jq '.[] | .key' | while read -r key; do
-          gh cache delete "$key"
-        done
-        # 输出缓存状态
-        echo "========cache status========"
-        echo "ccache: $(du -sh $OPENWRT_PATH/.ccache | cut -f 1)"
-        echo "staging: $(du -sh $OPENWRT_PATH/staging_dir | cut -f 1)"
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Delete Old Workflows(删除旧工作流)
-      uses: Mattraks/delete-workflow-runs@main
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        retain_days: 2
-        keep_minimum_runs: 0
+        generateReleaseNotes: false
+        immutableCreate: false
+        makeLatest: legacy
+        omitBody: false
+        omitBodyDuringUpdate: false
+        omitDraftDuringUpdate: false
+        omitName: false
+        omitNameDuringUpdate: false
+        omitPrereleaseDuringUpdate: false
+        removeArtifacts: false
+        replacesArtifacts: true
+        skipIfReleaseExists: false
+        updateOnlyUnreleased: false
