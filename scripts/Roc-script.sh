@@ -31,8 +31,7 @@ rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/packages/net/open-app-filter
 rm -rf feeds/packages/net/ariang
 rm -rf feeds/packages/lang/golang
-# 删除Luci中的状态-计划任务，可以通过http://192.168.2.1/cgi-bin/luci/admin/system/crontab进入
-rm -rf feeds/luci/applications/luci-app-crontab
+
 # Git稀疏克隆，只克隆指定目录到本地
 function git_sparse_clone() {
   branch="$1" repourl="$2" && shift 2
