@@ -2,6 +2,13 @@ name: JDCloud-ImmortalWrt
 
 on:
   workflow_dispatch:
+    # ========== 新增：勾选项，控制是否自动挂载 mmcblk0p24 ==========
+    inputs:
+      AUTO_MOUNT_MMC:
+        description: '自动挂载 mmcblk0p24 到 /overlay (外部 overlay)'
+        required: true
+        default: false
+        type: boolean
   workflow_call:
   # schedule:
   #   - cron: 0 20 * * *
@@ -162,6 +169,58 @@ jobs:
         <%+footer%>
         EOF
         echo "✅ NSS 版本页面已集成到固件 files 中"
+
+    # ========== 新增步骤：根据勾选框注入 mmcblk0p24 自动挂载脚本 ==========
+    - name: Auto mount mmcblk0p24 overlay (if selected)
+      if: github.event.inputs.AUTO_MOUNT_MMC == 'true'
+      run: |
+        echo "♻️ 启用 mmcblk0p24 自动挂载为 /overlay"
+        mkdir -p $OPENWRT_PATH/files/etc/uci-defaults
+        cat > $OPENWRT_PATH/files/etc/uci-defaults/99-mount-overlay << 'SCRIPT_EOF'
+        #!/bin/sh
+        # 自动配置 mmcblk0p24 为外部 overlay
+
+        # 等待 mmc 设备出现（最多尝试5次，每次2秒）
+        for i in 1 2 3 4 5; do
+          [ -b /dev/mmcblk0p24 ] && break
+          sleep 2
+        done
+
+        # 设备不存在则退出
+        if [ ! -b /dev/mmcblk0p24 ]; then
+          echo "mmcblk0p24 未找到，跳过 overlay 挂载"
+          exit 0
+        fi
+
+        # 创建临时挂载点，挂载新分区
+        mkdir -p /mnt/new_overlay
+        mount /dev/mmcblk0p24 /mnt/new_overlay
+
+        # 如果新分区为空，将当前 overlay 数据复制过去（首次迁移）
+        if [ -z "$(ls -A /mnt/new_overlay)" ]; then
+          echo "复制当前 overlay 数据到 mmcblk0p24 ..."
+          mount / -o remount,ro 2>/dev/null || true
+          cp -a /overlay/. /mnt/new_overlay/
+          mount / -o remount,rw 2>/dev/null || true
+        fi
+
+        umount /mnt/new_overlay
+
+        # 配置 fstab 自动挂载
+        uci -q delete fstab.@mount[-1]
+        uci add fstab mount
+        uci set fstab.@mount[-1].target='/overlay'
+        uci set fstab.@mount[-1].device='/dev/mmcblk0p24'
+        uci set fstab.@mount[-1].fstype='ext4'
+        uci set fstab.@mount[-1].options='rw,relatime'
+        uci set fstab.@mount[-1].enabled='1'
+        uci set fstab.@mount[-1].enabled_fsck='0'
+        uci commit fstab
+
+        echo "mmcblk0p24 已配置为外部 overlay，重启生效"
+        SCRIPT_EOF
+        chmod +x $OPENWRT_PATH/files/etc/uci-defaults/99-mount-overlay
+        echo "✅ mmcblk0p24 自动挂载脚本已注入到固件"
 
     - name: Compile Firmware(开始编译固件)
       id: compile
