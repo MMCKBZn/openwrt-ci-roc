@@ -2,7 +2,6 @@
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 sed -i "s/hostname='.*'/hostname='Roc'/g" package/base-files/files/bin/config_generate
 
-# ---------- 修复后的固件版本署名（使用 perl 避免破坏 JS 语法）----------
 FILE="feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js"
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
