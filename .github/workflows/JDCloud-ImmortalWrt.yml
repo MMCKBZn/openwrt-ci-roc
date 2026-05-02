@@ -117,6 +117,12 @@ jobs:
         sed -i "s/LibWrt/ImmortalWrt/g" package/base-files/files/etc/banner
         echo "✅ 版本标识已恢复为 ImmortalWrt"
 
+    # ---------- 新增：移除 APK 迁移提示 ----------
+    - name: Remove APK cheatsheet notice
+      run: |
+        rm -f ${{ env.OPENWRT_PATH }}/package/base-files/files/etc/profile.d/apk-cheatsheet.sh
+        echo "✅ 已移除 APK 迁移提示脚本"
+
     - name: Set release tag
       id: set_tag
       run: |
