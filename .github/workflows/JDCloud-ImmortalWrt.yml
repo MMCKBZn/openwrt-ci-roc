@@ -216,6 +216,21 @@ jobs:
         fi
         make defconfig
 
+    # ---------- 新增：强制修改默认WiFi名称 ----------
+    - name: Force default WiFi SSID via uci-defaults
+      run: |
+        cd "$OPENWRT_PATH"
+        mkdir -p files/etc/uci-defaults
+        cat > files/etc/uci-defaults/99-custom-wifi << 'EOF'
+        #!/bin/sh
+        uci set wireless.@wifi-iface[0].ssid='ImmortalWrt'
+        uci set wireless.@wifi-iface[1].ssid='ImmortalWrt_5G'
+        uci commit wireless
+        wifi reload
+        EOF
+        chmod +x files/etc/uci-defaults/99-custom-wifi
+        echo "✅ WiFi SSID覆盖脚本已添加"
+
     - name: Add custom NSS version LuCI page
       run: |
         cd $OPENWRT_PATH
