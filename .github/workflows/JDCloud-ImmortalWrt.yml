@@ -269,7 +269,7 @@ jobs:
           **This is OpenWrt Firmware for JDCloud**
           ### 📒 固件信息
           - 这是开启全功能NSS的6.12内核固件，默认主题为Aurora,集成了Docker（在软件包内安装不了Docker，不知道原因）；该仓库fork于laipeng668；如果软件源配置完apk update命令报错，请看Code下的ApkUpdate.txt文件
-          - 💻 这是 JDCloud 平台使用的 OpenWrt 固件
+          - 💻 这是 JDCloud 平台使用的 OpenWrt 25.12.0快照固件
           - ⚽ 固件源码: ${{ env.REPO_URL }}
           - 💝 源码分支: ${{ env.REPO_BRANCH }}
           - 🌐 默认地址: **192.168.2.1**
