@@ -219,9 +219,9 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
-     - name: Organize Files(整理文件)
-       if: steps.compile.outputs.status == 'success'
-       run: |
+    - name: Organize Files(整理文件)
+      if: steps.compile.outputs.status == 'success'
+      run: |
         cd $OPENWRT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
         cp $OPENWRT_PATH/.config Arthur.Athena.config
         mv config.buildinfo Arthur.Athena.config.buildinfo
