@@ -108,13 +108,15 @@ jobs:
         BANNER_END
         echo "✅ Banner 已替换为 ImmortalWrt 官方样式（已移除口号）"
 
-    - name: Restore ImmortalWrt branding
+      - name: Restore ImmortalWrt branding
       run: |
         cd $OPENWRT_PATH
-        sed -i 's/^VERSION_DIST:=.*/VERSION_DIST:="ImmortalWrt"/' include/version.mk
-        sed -i 's/^VERSION_REPO:=.*/VERSION_REPO:="https:\/\/github.com\/immortalwrt\/immortalwrt"/' include/version.mk
+        sed -i 's/^VERSION_DIST[:=]\s*.*/VERSION_DIST:="ImmortalWrt"/' include/version.mk
+        sed -i 's#^VERSION_REPO[:=]\s*.*#VERSION_REPO:="https://github.com/immortalwrt/immortalwrt"#' include/version.mk
+          echo 'VERSION_DIST:="ImmortalWrt"' >> include/version.mk
+        fi
         sed -i "s/LibWrt/ImmortalWrt/g" package/base-files/files/etc/banner
-        echo "✅ 版本标识已恢复为 ImmortalWrt"
+        echo "✅ 版本标识已强制恢复为 ImmortalWrt"
 
     - name: Remove APK cheatsheet notice
       run: |
