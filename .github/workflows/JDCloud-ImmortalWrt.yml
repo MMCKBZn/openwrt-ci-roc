@@ -11,7 +11,9 @@ permissions:
 
 env:
   REPO_URL: https://github.com/laipeng668/immortalwrt.git
-  REPO_BRANCH: master
+  REPO_BRANCH: openwrt-25.12
+  LIBWRT_REPO: https://github.com/laipeng668/openwrt-6.x.git
+  LIBWRT_BRANCH: 25.12-nss
   CONFIG_FILE: configs/JDCloud.config
   GENERAL_CONFIG_FILE: configs/General.config
   DIY_SCRIPT: scripts/Roc-script.sh
@@ -55,26 +57,42 @@ jobs:
         df -hT $GITHUB_WORKSPACE
         sudo mkdir -p /mnt/openwrt
         sudo chown -R $(id -u):$(id -g) /mnt/openwrt
+        # 克隆主源码 (ImmortalWrt)
         git clone --depth 1 -b $REPO_BRANCH --single-branch $REPO_URL /mnt/openwrt
         cd /mnt/openwrt
         echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
         VERSION_INFO=$(git show -s --date=short --format="作者: %an<br/>时间: %cd<br/>内容: %s<br/>hash: %H")
         echo "VERSION_INFO=$VERSION_INFO" >> $GITHUB_ENV
-        VERSION_KERNEL=$(grep -oP 'LINUX_KERNEL_HASH-\K[0-9]+\.[0-9]+\.[0-9]+' target/linux/generic/kernel-6.12)
-        echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
+        # 注意：内核版本现在还不能确定，等合并后再获取
+        echo "VERSION_KERNEL=待定" >> $GITHUB_ENV
 
-    # ========== 修复 CPU 使用率检测：强制启用内核调度统计 ==========
+    # ========== 新增：合并 LibWrt NSS 源码 ==========
+    - name: Merge LibWrt NSS source
+      run: |
+        cd $OPENWRT_PATH
+        echo "=== 开始合并 LibWrt ($LIBWRT_BRANCH) ==="
+        git remote add libwrt $LIBWRT_REPO
+        git fetch libwrt $LIBWRT_BRANCH
+        # 合并：冲突时全部采用 LibWrt 的版本 (theirs)
+        git merge -X theirs libwrt/$LIBWRT_BRANCH --allow-unrelated-histories
+        echo "✅ LibWrt 源码合并完成"
+        # 合并完成后获取真实内核版本
+        VERSION_KERNEL=$(grep -oP 'LINUX_VERSION-\K[0-9]+\.[0-9]+\.[0-9]+' include/kernel-version.mk 2>/dev/null || echo "unknown")
+        echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
+        echo "内核版本: $VERSION_KERNEL"
+
+    # ========== 修复 CPU 使用率检测：强制启用内核调度统计 (动态匹配内核配置) ==========
     - name: Enable kernel schedstats for CPU usage fix
       run: |
-        KERNEL_CFG="$OPENWRT_PATH/target/linux/qualcommax/ipq60xx/config-6.12"
+        KERNEL_CFG=$(ls $OPENWRT_PATH/target/linux/qualcommax/ipq60xx/config-* 2>/dev/null | head -1)
         if [ -f "$KERNEL_CFG" ]; then
           echo "CONFIG_SCHEDSTATS=y" >> "$KERNEL_CFG"
           echo "CONFIG_TASKSTATS=y" >> "$KERNEL_CFG"
           echo "CONFIG_TASK_DELAY_ACCT=y" >> "$KERNEL_CFG"
           echo "CONFIG_TASK_IO_ACCOUNTING=y" >> "$KERNEL_CFG"
-          echo "✅ 内核调度统计选项已启用"
+          echo "✅ 内核调度统计选项已启用 (配置文件: $KERNEL_CFG)"
         else
-          echo "⚠️ 警告：未找到内核配置文件 $KERNEL_CFG，CPU 统计可能异常"
+          echo "⚠️ 警告：未找到内核配置文件，CPU 统计可能异常"
         fi
 
     - name: Generate Variables(生成变量)
@@ -139,7 +157,7 @@ jobs:
         end
         EOF
 
-        # 创建视图模板（版本字体放大，无底部提示）
+        # 创建视图模板
         mkdir -p $OPENWRT_PATH/files/usr/lib/lua/luci/view
         cat > $OPENWRT_PATH/files/usr/lib/lua/luci/view/nss_version.htm << 'EOF'
         <%+header%>
