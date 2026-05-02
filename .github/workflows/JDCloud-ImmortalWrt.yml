@@ -219,13 +219,19 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
-    - name: Organize Files(整理文件)
-      if: steps.compile.outputs.status == 'success'
-      run: |
+     - name: Organize Files(整理文件)
+       if: steps.compile.outputs.status == 'success'
+       run: |
         cd $OPENWRT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
         cp $OPENWRT_PATH/.config Arthur.Athena.config
         mv config.buildinfo Arthur.Athena.config.buildinfo
-        mv immortalwrt-qualcommax-ipq60xx.manifest Arthur.Athena.manifest
+        # 动态匹配 manifest 文件
+        MANIFEST=$(find . -maxdepth 1 -name "*.manifest" -print -quit)
+        if [ -n "$MANIFEST" ]; then
+            mv "$MANIFEST" Arthur.Athena.manifest
+        else
+            echo "⚠️ 未找到 manifest 文件，跳过"
+        fi
         mv -f $OPENWRT_PATH/bin/packages/*/*/*.apk packages 2>/dev/null || true
         tar -zcf Arthur.Athena.Packages.tar.gz packages 2>/dev/null || true
         rm -rf packages feeds.buildinfo version.buildinfo sha256sums profiles.json
