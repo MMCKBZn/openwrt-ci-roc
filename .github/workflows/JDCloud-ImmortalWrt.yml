@@ -92,6 +92,23 @@ jobs:
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
         echo "内核版本: $VERSION_KERNEL"
 
+  - name: Fix SSH banner to ImmortalWrt
+      run: |
+        cd ${{ env.OPENWRT_PATH }}
+        cat > package/base-files/files/etc/banner << 'BANNER_END'
+         __  __                      __          __  _       
+        /\ \/\ \                    /\ \        /\ \/ \      
+        \ \ \_\ \     __    ___     \_\ \     __\ \ \_/__   
+         \ \  _  \  /'__`\/' _ `\   /'_` \  /'__`\ \  _ `\ 
+          \ \ \ \ \/\  __//\ \/\ \ /\ \L\ \/\ \L\.\_\ \ \ \ 
+           \ \_\ \_\ \____\ \_\ \_\\ \___,_\ \__/.\_\\ \_\ \ 
+            \/_/\/_/\/____/\/_/\/_/ \/__,_ /\/__/\/_/ \/_/\/ 
+        ----------------------------------------------------
+         ImmortalWrt %V, %C 
+        ----------------------------------------------------
+        BANNER_END
+        echo "✅ Banner 已替换为 ImmortalWrt 样式"
+        
     - name: Restore ImmortalWrt branding
       run: |
         cd $OPENWRT_PATH
