@@ -119,9 +119,20 @@ jobs:
         sed -i "s/LibWrt/ImmortalWrt/g" package/base-files/files/etc/banner
         echo "✅ 版本标识已强制恢复为 ImmortalWrt"
 
+    # ---------- 新增：清除 LuCI 状态页硬编码构建信息 ----------
+    - name: Clean hardcoded build info from LuCI status page
+      run: |
+        FILE="$OPENWRT_PATH/package/luci/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js"
+        if [ -f "$FILE" ]; then
+          sed -i "/E('a',{href:'https:\/\/github\.com\/MMCKBZn\/openwrt-ci-roc\/releases\/tag\/JDCloud'/d" "$FILE"
+          echo "✅ 已移除 LuCI 状态页中的硬编码构建者信息"
+        else
+          echo "⚠️ 未找到 $FILE ，跳过"
+        fi
+
     - name: Remove APK cheatsheet notice
       run: |
-        rm -f ${{ env.OPENWRT_PATH }}/package/base-files/files/etc/profile.d/apk-cheatsheet.sh
+        rm -f "$OPENWRT_PATH/package/base-files/files/etc/profile.d/apk-cheatsheet.sh"
         echo "✅ 已移除 APK 迁移提示脚本"
 
     - name: Set release tag
