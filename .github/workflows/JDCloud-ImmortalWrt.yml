@@ -10,15 +10,18 @@ permissions:
   contents: write
 
 env:
+  # 主源码 (ImmortalWrt)
   REPO_URL: https://github.com/laipeng668/immortalwrt.git
   REPO_BRANCH: openwrt-25.12
+  # LibWrt NSS 源码
   LIBWRT_REPO: https://github.com/laipeng668/openwrt-6.x.git
   LIBWRT_BRANCH: 25.12-nss
+  # 其他配置
   CONFIG_FILE: configs/JDCloud.config
   GENERAL_CONFIG_FILE: configs/General.config
   DIY_SCRIPT: scripts/Roc-script.sh
   CLASH_KERNEL: amd64
-  FIRMWARE_TAG: JDCloud
+  FIRMWARE_TAG: JDCloud   # 基础标签，最终 Tag 会加上分支后缀
   TZ: Asia/Shanghai
 
 jobs:
@@ -63,25 +66,34 @@ jobs:
         echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
         VERSION_INFO=$(git show -s --date=short --format="作者: %an<br/>时间: %cd<br/>内容: %s<br/>hash: %H")
         echo "VERSION_INFO=$VERSION_INFO" >> $GITHUB_ENV
-        # 注意：内核版本现在还不能确定，等合并后再获取
         echo "VERSION_KERNEL=待定" >> $GITHUB_ENV
 
-    # ========== 新增：合并 LibWrt NSS 源码 ==========
+    # ========== 合并 LibWrt NSS 源码 ==========
     - name: Merge LibWrt NSS source
       run: |
         cd $OPENWRT_PATH
         echo "=== 开始合并 LibWrt ($LIBWRT_BRANCH) ==="
         git remote add libwrt $LIBWRT_REPO
         git fetch libwrt $LIBWRT_BRANCH
-        # 合并：冲突时全部采用 LibWrt 的版本 (theirs)
         git merge -X theirs libwrt/$LIBWRT_BRANCH --allow-unrelated-histories
         echo "✅ LibWrt 源码合并完成"
-        # 合并完成后获取真实内核版本
         VERSION_KERNEL=$(grep -oP 'LINUX_VERSION-\K[0-9]+\.[0-9]+\.[0-9]+' include/kernel-version.mk 2>/dev/null || echo "unknown")
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
         echo "内核版本: $VERSION_KERNEL"
 
-    # ========== 修复 CPU 使用率检测：强制启用内核调度统计 (动态匹配内核配置) ==========
+    # ========== 动态设置 Release Tag ==========
+    - name: Set release tag
+      id: set_tag
+      run: |
+        # 获取当前分支名，并把斜杠“/”替换为横杠“-”
+        BRANCH="${{ github.ref_name }}"
+        SAFE_BRANCH=$(echo "$BRANCH" | sed 's/\//-/g')
+        # 最终 Tag 格式：JDCloud-分支名（例如 JDCloud-openwrt-25.12 或 JDCloud-25.12-nss）
+        RELEASE_TAG="${{ env.FIRMWARE_TAG }}-${SAFE_BRANCH}"
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_OUTPUT
+        echo "📌 Release Tag 设置为: $RELEASE_TAG"
+
+    # ========== 修复 CPU 使用率检测 ==========
     - name: Enable kernel schedstats for CPU usage fix
       run: |
         KERNEL_CFG=$(ls $OPENWRT_PATH/target/linux/qualcommax/ipq60xx/config-* 2>/dev/null | head -1)
@@ -145,10 +157,9 @@ jobs:
         make defconfig
         make download -j$(nproc)
 
-    # ========== 新增步骤：集成 NSS 版本独立页面 ==========
+    # ========== 集成 NSS 版本 LuCI 页面 ==========
     - name: Add custom NSS version LuCI page
       run: |
-        # 创建控制器文件
         mkdir -p $OPENWRT_PATH/files/usr/lib/lua/luci/controller
         cat > $OPENWRT_PATH/files/usr/lib/lua/luci/controller/nss.lua << 'EOF'
         module("luci.controller.nss", package.seeall)
@@ -157,7 +168,6 @@ jobs:
         end
         EOF
 
-        # 创建视图模板
         mkdir -p $OPENWRT_PATH/files/usr/lib/lua/luci/view
         cat > $OPENWRT_PATH/files/usr/lib/lua/luci/view/nss_version.htm << 'EOF'
         <%+header%>
@@ -232,7 +242,7 @@ jobs:
       with:
         name: ${{ env.DATE }} for ${{ env.FIRMWARE_TAG }}
         allowUpdates: true
-        tag: ${{ env.FIRMWARE_TAG }}
+        tag: ${{ steps.set_tag.outputs.RELEASE_TAG }}    # 使用动态 Tag
         token: ${{ secrets.GITHUB_TOKEN }}
         artifacts: "${{ env.FIRMWARE_PATH }}/*sysupgrade*,${{ env.FIRMWARE_PATH }}/*factory*,${{ env.FIRMWARE_PATH }}/Arthur.Athena*"
         body: |
