@@ -64,7 +64,6 @@ jobs:
         echo "VERSION_INFO=$VERSION_INFO" >> $GITHUB_ENV
         echo "VERSION_KERNEL=待定" >> $GITHUB_ENV
 
-    # ========== 合并 LibWrt（强制解决冲突） ==========
     - name: Merge LibWrt NSS source
       run: |
         cd $OPENWRT_PATH
@@ -93,7 +92,14 @@ jobs:
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
         echo "内核版本: $VERSION_KERNEL"
 
-    # ========== 动态设置 Release Tag ==========
+    - name: Restore ImmortalWrt branding
+      run: |
+        cd $OPENWRT_PATH
+        sed -i 's/^VERSION_DIST:=.*/VERSION_DIST:="ImmortalWrt"/' include/version.mk
+        sed -i 's/^VERSION_REPO:=.*/VERSION_REPO:="https:\/\/github.com\/immortalwrt\/immortalwrt"/' include/version.mk
+        sed -i "s/LibWrt/ImmortalWrt/g" package/base-files/files/etc/banner
+        echo "✅ 版本标识已恢复为 ImmortalWrt"
+
     - name: Set release tag
       id: set_tag
       run: |
@@ -103,7 +109,6 @@ jobs:
         echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_OUTPUT
         echo "📌 Release Tag 设置为: $RELEASE_TAG"
 
-    # ========== 启用内核调度统计 ==========
     - name: Enable kernel schedstats for CPU usage fix
       run: |
         KERNEL_CFG=$(ls $OPENWRT_PATH/target/linux/qualcommax/ipq60xx/config-* 2>/dev/null | head -1)
