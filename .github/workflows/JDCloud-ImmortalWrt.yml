@@ -189,6 +189,13 @@ jobs:
         make defconfig
         make download -j$(nproc)
 
+     - name: Set hostname to ImmortalWrt
+        run: |
+          sed -i 's/.*CONFIG_TARGET_HOSTNAME=.*/CONFIG_TARGET_HOSTNAME="ImmortalWrt"/' .config
+          make defconfig
+
+      - name: Build firmware
+        run: make -j$(nproc) V=s
     - name: Add custom NSS version LuCI page
       run: |
         mkdir -p $OPENWRT_PATH/files/usr/lib/lua/luci/controller
