@@ -68,10 +68,11 @@ jobs:
         echo "VERSION_INFO=$VERSION_INFO" >> $GITHUB_ENV
         echo "VERSION_KERNEL=待定" >> $GITHUB_ENV
 
-    # ========== 合并 LibWrt NSS 源码 ==========
-    - name: Merge LibWrt NSS source
-      run: |
+        - name: Merge LibWrt NSS source|
         cd $OPENWRT_PATH
+        # 设置 Git 身份（必需，否则 merge 会报错）
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"
         echo "=== 开始合并 LibWrt ($LIBWRT_BRANCH) ==="
         git remote add libwrt $LIBWRT_REPO
         git fetch libwrt $LIBWRT_BRANCH
