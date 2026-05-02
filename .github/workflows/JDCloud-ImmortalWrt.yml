@@ -63,7 +63,6 @@ jobs:
         VERSION_KERNEL=$(grep -oP 'LINUX_KERNEL_HASH-\K[0-9]+\.[0-9]+\.[0-9]+' target/linux/generic/kernel-6.12)
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
 
-    # ========== 修复 CPU 使用率检测：强制启用内核调度统计 ==========
     - name: Enable kernel schedstats for CPU usage fix
       run: |
         KERNEL_CFG="$OPENWRT_PATH/target/linux/qualcommax/ipq60xx/config-6.12"
@@ -127,7 +126,6 @@ jobs:
         make defconfig
         make download -j$(nproc)
 
-    # ========== 新增步骤：集成 NSS 版本独立页面 ==========
     - name: Add custom NSS version LuCI page
       run: |
         # 创建控制器文件
