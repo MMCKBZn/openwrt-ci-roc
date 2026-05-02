@@ -105,14 +105,15 @@ jobs:
  ------------------------------------------------------
  %D %V, %C Dave's Guitar
  ------------------------------------------------------
-        BANNER_END
+BANNER_END
         echo "✅ Banner 已替换为 ImmortalWrt 官方样式（已移除口号）"
 
-      - name: Restore ImmortalWrt branding
+    - name: Restore ImmortalWrt branding
       run: |
         cd $OPENWRT_PATH
         sed -i 's/^VERSION_DIST[:=]\s*.*/VERSION_DIST:="ImmortalWrt"/' include/version.mk
         sed -i 's#^VERSION_REPO[:=]\s*.*#VERSION_REPO:="https://github.com/immortalwrt/immortalwrt"#' include/version.mk
+        if ! grep -q '^VERSION_DIST' include/version.mk; then
           echo 'VERSION_DIST:="ImmortalWrt"' >> include/version.mk
         fi
         sed -i "s/LibWrt/ImmortalWrt/g" package/base-files/files/etc/banner
