@@ -92,9 +92,9 @@ jobs:
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
         echo "内核版本: $VERSION_KERNEL"
 
-  - name: Fix SSH banner to ImmortalWrt
+    - name: Fix SSH banner to ImmortalWrt
       run: |
-        cd ${{ env.OPENWRT_PATH }}
+        cd $OPENWRT_PATH
         cat > package/base-files/files/etc/banner << 'BANNER_END'
          __  __                      __          __  _       
         /\ \/\ \                    /\ \        /\ \/ \      
@@ -108,7 +108,7 @@ jobs:
         ----------------------------------------------------
         BANNER_END
         echo "✅ Banner 已替换为 ImmortalWrt 样式"
-        
+
     - name: Restore ImmortalWrt branding
       run: |
         cd $OPENWRT_PATH
@@ -189,25 +189,28 @@ jobs:
         make defconfig
         make download -j$(nproc)
 
-     - name: Set hostname to ImmortalWrt
-        run: |
-          sed -i 's/.*CONFIG_TARGET_HOSTNAME=.*/CONFIG_TARGET_HOSTNAME="ImmortalWrt"/' .config
-          make defconfig
+    - name: Set hostname to ImmortalWrt
+      run: |
+        cd $OPENWRT_PATH
+        sed -i 's/.*CONFIG_TARGET_HOSTNAME=.*/CONFIG_TARGET_HOSTNAME="ImmortalWrt"/' .config
+        if ! grep -q "CONFIG_TARGET_HOSTNAME" .config; then
+          echo 'CONFIG_TARGET_HOSTNAME="ImmortalWrt"' >> .config
+        fi
+        make defconfig
 
-      - name: Build firmware
-        run: make -j$(nproc) V=s
     - name: Add custom NSS version LuCI page
       run: |
-        mkdir -p $OPENWRT_PATH/files/usr/lib/lua/luci/controller
-        cat > $OPENWRT_PATH/files/usr/lib/lua/luci/controller/nss.lua << 'EOF'
+        cd $OPENWRT_PATH
+        mkdir -p files/usr/lib/lua/luci/controller
+        cat > files/usr/lib/lua/luci/controller/nss.lua << 'EOF'
         module("luci.controller.nss", package.seeall)
         function index()
             entry({"admin", "status", "nss_version"}, template("nss_version"), _("NSS 版本"), 60)
         end
         EOF
 
-        mkdir -p $OPENWRT_PATH/files/usr/lib/lua/luci/view
-        cat > $OPENWRT_PATH/files/usr/lib/lua/luci/view/nss_version.htm << 'EOF'
+        mkdir -p files/usr/lib/lua/luci/view
+        cat > files/usr/lib/lua/luci/view/nss_version.htm << 'EOF'
         <%+header%>
         <h2 name="title">NSS 版本</h2>
         <pre style="padding:16px; background:#f5f5f5; border-radius:4px; font-size:1.2em;">
