@@ -10,18 +10,15 @@ permissions:
   contents: write
 
 env:
-  # 主源码 (ImmortalWrt)
   REPO_URL: https://github.com/laipeng668/immortalwrt.git
   REPO_BRANCH: openwrt-25.12
-  # LibWrt NSS 源码
   LIBWRT_REPO: https://github.com/laipeng668/openwrt-6.x.git
   LIBWRT_BRANCH: 25.12-nss
-  # 其他配置
   CONFIG_FILE: configs/JDCloud.config
   GENERAL_CONFIG_FILE: configs/General.config
   DIY_SCRIPT: scripts/Roc-script.sh
   CLASH_KERNEL: amd64
-  FIRMWARE_TAG: JDCloud   # 基础标签，最终 Tag 会加上分支后缀
+  FIRMWARE_TAG: JDCloud
   TZ: Asia/Shanghai
 
 jobs:
@@ -60,7 +57,6 @@ jobs:
         df -hT $GITHUB_WORKSPACE
         sudo mkdir -p /mnt/openwrt
         sudo chown -R $(id -u):$(id -g) /mnt/openwrt
-        # 克隆主源码 (ImmortalWrt)
         git clone --depth 1 -b $REPO_BRANCH --single-branch $REPO_URL /mnt/openwrt
         cd /mnt/openwrt
         echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
@@ -68,16 +64,31 @@ jobs:
         echo "VERSION_INFO=$VERSION_INFO" >> $GITHUB_ENV
         echo "VERSION_KERNEL=待定" >> $GITHUB_ENV
 
-        - name: Merge LibWrt NSS source|
+    # ========== 合并 LibWrt（强制解决冲突） ==========
+    - name: Merge LibWrt NSS source
+      run: |
         cd $OPENWRT_PATH
-        # 设置 Git 身份（必需，否则 merge 会报错）
+        # 设置 Git 身份
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git config user.name "github-actions[bot]"
         echo "=== 开始合并 LibWrt ($LIBWRT_BRANCH) ==="
         git remote add libwrt $LIBWRT_REPO
         git fetch libwrt $LIBWRT_BRANCH
-        git merge -X theirs libwrt/$LIBWRT_BRANCH --allow-unrelated-histories
+
+        # 合并但不自动提交，添加 strategy-option 处理内容冲突
+        git merge --no-commit --no-ff -X theirs libwrt/$LIBWRT_BRANCH --allow-unrelated-histories || {
+          echo "⚠️ 检测到未自动解决的冲突（多为 add/add 文件冲突），将使用 LibWrt 版本覆盖"
+          # 列出所有冲突文件
+          echo "冲突文件列表："
+          git diff --name-only --diff-filter=U
+          # 全部采用 libwrt 分支的版本
+          git diff --name-only --diff-filter=U | xargs -r git checkout --theirs
+          git add .
+          git commit -m "Merge LibWrt NSS branch (forced theirs resolution)"
+        }
         echo "✅ LibWrt 源码合并完成"
+
+        # 获取实际内核版本
         VERSION_KERNEL=$(grep -oP 'LINUX_VERSION-\K[0-9]+\.[0-9]+\.[0-9]+' include/kernel-version.mk 2>/dev/null || echo "unknown")
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
         echo "内核版本: $VERSION_KERNEL"
@@ -86,15 +97,13 @@ jobs:
     - name: Set release tag
       id: set_tag
       run: |
-        # 获取当前分支名，并把斜杠“/”替换为横杠“-”
         BRANCH="${{ github.ref_name }}"
         SAFE_BRANCH=$(echo "$BRANCH" | sed 's/\//-/g')
-        # 最终 Tag 格式：JDCloud-分支名（例如 JDCloud-openwrt-25.12 或 JDCloud-25.12-nss）
         RELEASE_TAG="${{ env.FIRMWARE_TAG }}-${SAFE_BRANCH}"
         echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_OUTPUT
         echo "📌 Release Tag 设置为: $RELEASE_TAG"
 
-    # ========== 修复 CPU 使用率检测 ==========
+    # ========== 启用内核调度统计 ==========
     - name: Enable kernel schedstats for CPU usage fix
       run: |
         KERNEL_CFG=$(ls $OPENWRT_PATH/target/linux/qualcommax/ipq60xx/config-* 2>/dev/null | head -1)
@@ -158,7 +167,6 @@ jobs:
         make defconfig
         make download -j$(nproc)
 
-    # ========== 集成 NSS 版本 LuCI 页面 ==========
     - name: Add custom NSS version LuCI page
       run: |
         mkdir -p $OPENWRT_PATH/files/usr/lib/lua/luci/controller
@@ -243,7 +251,7 @@ jobs:
       with:
         name: ${{ env.DATE }} for ${{ env.FIRMWARE_TAG }}
         allowUpdates: true
-        tag: ${{ steps.set_tag.outputs.RELEASE_TAG }}    # 使用动态 Tag
+        tag: ${{ steps.set_tag.outputs.RELEASE_TAG }}
         token: ${{ secrets.GITHUB_TOKEN }}
         artifacts: "${{ env.FIRMWARE_PATH }}/*sysupgrade*,${{ env.FIRMWARE_PATH }}/*factory*,${{ env.FIRMWARE_PATH }}/Arthur.Athena*"
         body: |
