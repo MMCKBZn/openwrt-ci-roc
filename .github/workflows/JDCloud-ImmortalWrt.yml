@@ -96,18 +96,17 @@ jobs:
       run: |
         cd $OPENWRT_PATH
         cat > package/base-files/files/etc/banner << 'BANNER_END'
-         __  __                      __          __  _       
-        /\ \/\ \                    /\ \        /\ \/ \      
-        \ \ \_\ \     __    ___     \_\ \     __\ \ \_/__   
-         \ \  _  \  /'__`\/' _ `\   /'_` \  /'__`\ \  _ `\ 
-          \ \ \ \ \/\  __//\ \/\ \ /\ \L\ \/\ \L\.\_\ \ \ \ 
-           \ \_\ \_\ \____\ \_\ \_\\ \___,_\ \__/.\_\\ \_\ \ 
-            \/_/\/_/\/____/\/_/\/_/ \/__,_ /\/__/\/_/ \/_/\/ 
-        ----------------------------------------------------
-         ImmortalWrt %V, %C 
-        ----------------------------------------------------
+.___                               __         .__
+|   | _____   _____   ____________/  |______  |  |
+|   |/     \ /     \ /  _ \_  __ \   __\__  \ |  |
+|   |  Y Y  \  Y Y  (  <_> )  | \/|  |  / __ \|  |__
+|___|__|_|  /__|_|  /\____/|__|   |__| (____  /____/
+          \/      \/                       \/
+ ------------------------------------------------------
+ %D %V, %C Dave's Guitar
+ ------------------------------------------------------
         BANNER_END
-        echo "✅ Banner 已替换为 ImmortalWrt 样式"
+        echo "✅ Banner 已替换为 ImmortalWrt 官方样式（已移除口号）"
 
     - name: Restore ImmortalWrt branding
       run: |
@@ -117,7 +116,6 @@ jobs:
         sed -i "s/LibWrt/ImmortalWrt/g" package/base-files/files/etc/banner
         echo "✅ 版本标识已恢复为 ImmortalWrt"
 
-    # ---------- 新增：移除 APK 迁移提示 ----------
     - name: Remove APK cheatsheet notice
       run: |
         rm -f ${{ env.OPENWRT_PATH }}/package/base-files/files/etc/profile.d/apk-cheatsheet.sh
