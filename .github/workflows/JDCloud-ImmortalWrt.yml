@@ -67,27 +67,20 @@ jobs:
     - name: Merge LibWrt NSS source
       run: |
         cd $OPENWRT_PATH
-        # 设置 Git 身份
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git config user.name "github-actions[bot]"
         echo "=== 开始合并 LibWrt ($LIBWRT_BRANCH) ==="
         git remote add libwrt $LIBWRT_REPO
         git fetch libwrt $LIBWRT_BRANCH
-
-        # 合并但不自动提交，添加 strategy-option 处理内容冲突
         git merge --no-commit --no-ff -X theirs libwrt/$LIBWRT_BRANCH --allow-unrelated-histories || {
           echo "⚠️ 检测到未自动解决的冲突（多为 add/add 文件冲突），将使用 LibWrt 版本覆盖"
-          # 列出所有冲突文件
           echo "冲突文件列表："
           git diff --name-only --diff-filter=U
-          # 全部采用 libwrt 分支的版本
           git diff --name-only --diff-filter=U | xargs -r git checkout --theirs
           git add .
           git commit -m "Merge LibWrt NSS branch (forced theirs resolution)"
         }
         echo "✅ LibWrt 源码合并完成"
-
-        # 获取实际内核版本
         VERSION_KERNEL=$(grep -oP '^LINUX_VERSION-\K[0-9]+\.[0-9]+(\.[0-9]+)?' include/kernel-version.mk 2>/dev/null || echo "unknown")
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
         echo "内核版本: $VERSION_KERNEL"
@@ -215,28 +208,39 @@ jobs:
         fi
         make defconfig
 
-    - name: Add rc.local to clean legacy iptables rules after boot
+    # ---------- 新增步骤：Docker nftables 配置 + 清理旧规则 ----------
+    - name: Set Docker to nftables mode and clean legacy rules
       run: |
         cd "$OPENWRT_PATH"
+        mkdir -p files/etc/docker
+        cat > files/etc/docker/daemon.json << 'EOF'
+{
+  "iptables": false,
+  "features": {
+    "nftables": true
+  }
+}
+EOF
+        echo "✅ 已配置 Docker 使用原生 nftables（不再产生 iptables 规则）"
+
         mkdir -p files/etc
         printf '%s\n' \
           '#!/bin/sh' \
-          '# 等待所有服务启动完毕后，清除可能残留的旧版 iptables 规则' \
-          '( sleep 5' \
-          'for ip in iptables-legacy iptables; do' \
-          '  $ip -F 2>/dev/null' \
-          '  $ip -X 2>/dev/null' \
-          '  $ip -t nat -F 2>/dev/null' \
-          '  $ip -t nat -X 2>/dev/null' \
-          '  $ip -t mangle -F 2>/dev/null' \
-          '  $ip -t mangle -X 2>/dev/null' \
-          'done' \
-          '/etc/init.d/firewall restart 2>/dev/null' \
+          '# 清理可能残留的旧 iptables 规则（主要为兼容层产生）' \
+          '( sleep 10' \
+          '  for cmd in iptables-legacy iptables; do' \
+          '    for table in filter nat mangle raw; do' \
+          '      $cmd -t $table -F 2>/dev/null' \
+          '      $cmd -t $table -X 2>/dev/null' \
+          '    done' \
+          '  done' \
+          '  /etc/init.d/firewall4 restart 2>/dev/null || /etc/init.d/firewall restart 2>/dev/null' \
           ') &' \
           'exit 0' \
           > files/etc/rc.local
         chmod +x files/etc/rc.local
-        echo "✅ 已添加 rc.local 延迟清除脚本"
+        echo "✅ 已添加 rc.local 辅助清理脚本"
+    # ---------- 结束新增 ----------
 
     - name: Force default WiFi SSID via uci-defaults
       run: |
@@ -311,7 +315,6 @@ jobs:
         cd $OPENWRT_PATH/bin/targets/$DEVICE_TARGET/$DEVICE_SUBTARGET
         cp $OPENWRT_PATH/.config Arthur.Athena.config
         mv config.buildinfo Arthur.Athena.config.buildinfo
-        # 动态匹配 manifest 文件
         MANIFEST=$(find . -maxdepth 1 -name "*.manifest" -print -quit)
         if [ -n "$MANIFEST" ]; then
             mv "$MANIFEST" Arthur.Athena.manifest
