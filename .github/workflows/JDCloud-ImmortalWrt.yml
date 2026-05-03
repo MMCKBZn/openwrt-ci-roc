@@ -215,27 +215,29 @@ jobs:
         fi
         make defconfig
 
-    # ---------- 新增：首次启动时清空旧 iptables 规则 ----------
-    - name: Add uci-defaults script to clean legacy iptables rules on first boot
+       # ---------- 通过 rc.local 延迟清除旧 iptables 规则 ----------
+    - name: Add rc.local to clean legacy iptables rules after boot
       run: |
         cd "$OPENWRT_PATH"
-        mkdir -p files/etc/uci-defaults
-        cat > files/etc/uci-defaults/98-clean-legacy-iptables << 'EOF'
-        #!/bin/sh
-        # 首次启动时清空旧 iptables 规则，让 firewall4 重新接管
-        iptables -F 2>/dev/null
-        iptables -X 2>/dev/null
-        iptables -t nat -F 2>/dev/null
-        iptables -t nat -X 2>/dev/null
-        iptables -t mangle -F 2>/dev/null
-        iptables -t mangle -X 2>/dev/null
-        iptables -P INPUT ACCEPT 2>/dev/null
-        iptables -P FORWARD ACCEPT 2>/dev/null
-        iptables -P OUTPUT ACCEPT 2>/dev/null
-        /etc/init.d/firewall restart 2>/dev/null || /etc/init.d/firewall4 restart 2>/dev/null
-        EOF
-        chmod +x files/etc/uci-defaults/98-clean-legacy-iptables
-        echo "✅ 已添加旧 iptables 规则清理脚本，首次启动时自动执行"
+        mkdir -p files/etc
+        cat > files/etc/rc.local << 'EOF'
+  #!/bin/sh
+# 等待所有服务启动完毕后，清除可能残留的旧版 iptables 规则
+   ( sleep 5
+  for ip in iptables-legacy iptables; do
+    $ip -F 2>/dev/null
+    $ip -X 2>/dev/null
+    $ip -t nat -F 2>/dev/null
+    $ip -t nat -X 2>/dev/null
+    $ip -t mangle -F 2>/dev/null
+    $ip -t mangle -X 2>/dev/null
+  done
+  /etc/init.d/firewall restart 2>/dev/null
+) &
+exit 0
+EOF
+        chmod +x files/etc/rc.local
+        echo "✅ 已添加 rc.local 延迟清除脚本"
 
     # ---------- 强制修改默认WiFi名称 ----------
     - name: Force default WiFi SSID via uci-defaults
