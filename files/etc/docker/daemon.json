@@ -1,0 +1,6 @@
+{
+  "iptables": false,
+  "features": {
+    "nftables": true
+  }
+}
