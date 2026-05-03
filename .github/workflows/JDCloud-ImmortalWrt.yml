@@ -215,31 +215,29 @@ jobs:
         fi
         make defconfig
 
-       # ---------- 通过 rc.local 延迟清除旧 iptables 规则 ----------
     - name: Add rc.local to clean legacy iptables rules after boot
       run: |
         cd "$OPENWRT_PATH"
         mkdir -p files/etc
-        cat > files/etc/rc.local << 'EOF'
-  #!/bin/sh
-# 等待所有服务启动完毕后，清除可能残留的旧版 iptables 规则
-   ( sleep 5
-  for ip in iptables-legacy iptables; do
-    $ip -F 2>/dev/null
-    $ip -X 2>/dev/null
-    $ip -t nat -F 2>/dev/null
-    $ip -t nat -X 2>/dev/null
-    $ip -t mangle -F 2>/dev/null
-    $ip -t mangle -X 2>/dev/null
-  done
-  /etc/init.d/firewall restart 2>/dev/null
-) &
-exit 0
-EOF
+        printf '%s\n' \
+          '#!/bin/sh' \
+          '# 等待所有服务启动完毕后，清除可能残留的旧版 iptables 规则' \
+          '( sleep 5' \
+          'for ip in iptables-legacy iptables; do' \
+          '  $ip -F 2>/dev/null' \
+          '  $ip -X 2>/dev/null' \
+          '  $ip -t nat -F 2>/dev/null' \
+          '  $ip -t nat -X 2>/dev/null' \
+          '  $ip -t mangle -F 2>/dev/null' \
+          '  $ip -t mangle -X 2>/dev/null' \
+          'done' \
+          '/etc/init.d/firewall restart 2>/dev/null' \
+          ') &' \
+          'exit 0' \
+          > files/etc/rc.local
         chmod +x files/etc/rc.local
         echo "✅ 已添加 rc.local 延迟清除脚本"
 
-    # ---------- 强制修改默认WiFi名称 ----------
     - name: Force default WiFi SSID via uci-defaults
       run: |
         cd "$OPENWRT_PATH"
