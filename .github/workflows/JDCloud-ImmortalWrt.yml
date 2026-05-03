@@ -208,19 +208,19 @@ jobs:
         fi
         make defconfig
 
-    # ---------- 新增步骤：Docker nftables 配置 + 清理旧规则 ----------
+    # ---------- 修复后的步骤：Docker nftables 配置 + 清理旧规则 ----------
     - name: Set Docker to nftables mode and clean legacy rules
       run: |
         cd "$OPENWRT_PATH"
         mkdir -p files/etc/docker
-        cat > files/etc/docker/daemon.json << 'EOF'
-{
-  "iptables": false,
-  "features": {
-    "nftables": true
-  }
-}
-EOF
+        printf '%s\n' \
+          '{' \
+          '  "iptables": false,' \
+          '  "features": {' \
+          '    "nftables": true' \
+          '  }' \
+          '}' \
+          > files/etc/docker/daemon.json
         echo "✅ 已配置 Docker 使用原生 nftables（不再产生 iptables 规则）"
 
         mkdir -p files/etc
@@ -240,7 +240,7 @@ EOF
           > files/etc/rc.local
         chmod +x files/etc/rc.local
         echo "✅ 已添加 rc.local 辅助清理脚本"
-    # ---------- 结束新增 ----------
+    # ---------- 结束 ----------
 
     - name: Force default WiFi SSID via uci-defaults
       run: |
