@@ -119,7 +119,6 @@ jobs:
         sed -i "s/LibWrt/ImmortalWrt/g" package/base-files/files/etc/banner
         echo "✅ 版本标识已强制恢复为 ImmortalWrt"
 
-    # ---------- 新增：清除 LuCI 状态页硬编码构建信息 ----------
     - name: Clean hardcoded build info from LuCI status page
       run: |
         FILE="$OPENWRT_PATH/package/luci/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js"
@@ -216,7 +215,29 @@ jobs:
         fi
         make defconfig
 
-    # ---------- 新增：强制修改默认WiFi名称 ----------
+    # ---------- 新增：首次启动时清空旧 iptables 规则 ----------
+    - name: Add uci-defaults script to clean legacy iptables rules on first boot
+      run: |
+        cd "$OPENWRT_PATH"
+        mkdir -p files/etc/uci-defaults
+        cat > files/etc/uci-defaults/98-clean-legacy-iptables << 'EOF'
+        #!/bin/sh
+        # 首次启动时清空旧 iptables 规则，让 firewall4 重新接管
+        iptables -F 2>/dev/null
+        iptables -X 2>/dev/null
+        iptables -t nat -F 2>/dev/null
+        iptables -t nat -X 2>/dev/null
+        iptables -t mangle -F 2>/dev/null
+        iptables -t mangle -X 2>/dev/null
+        iptables -P INPUT ACCEPT 2>/dev/null
+        iptables -P FORWARD ACCEPT 2>/dev/null
+        iptables -P OUTPUT ACCEPT 2>/dev/null
+        /etc/init.d/firewall restart 2>/dev/null || /etc/init.d/firewall4 restart 2>/dev/null
+        EOF
+        chmod +x files/etc/uci-defaults/98-clean-legacy-iptables
+        echo "✅ 已添加旧 iptables 规则清理脚本，首次启动时自动执行"
+
+    # ---------- 强制修改默认WiFi名称 ----------
     - name: Force default WiFi SSID via uci-defaults
       run: |
         cd "$OPENWRT_PATH"
