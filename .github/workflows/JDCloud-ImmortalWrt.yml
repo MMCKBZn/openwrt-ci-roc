@@ -290,11 +290,12 @@ jobs:
         EOF
         echo "✅ NSS 版本页面已集成到固件 files 中"
 
-    - name: 注入 libmbedtls21 库文件
+    - name: 注入 libmbedtls21 库文件（支持 zstd 压缩的 apk）
       run: |
         cd "$OPENWRT_PATH"
+        sudo apt-get install -y zstd
         wget https://downloads.openwrt.org/releases/packages-25.12/aarch64_cortex-a53/base/libmbedtls21-3.6.6-r1.apk
-        tar -xf libmbedtls21-3.6.6-r1.apk data.tar.gz
+        tar --zstd -xf libmbedtls21-3.6.6-r1.apk data.tar.gz
         tar -xzf data.tar.gz -C files/
         rm -f libmbedtls21-3.6.6-r1.apk data.tar.gz
         echo "✅ libmbedtls21 库文件已注入到固件 files 目录"
