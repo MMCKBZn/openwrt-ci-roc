@@ -13,7 +13,7 @@ env:
   REPO_URL:
 https://github.com/MMCKBZn/immortalwrt.git
   REPO_BRANCH: openwrt-25.12
-  LIBWRT_REPO: https://github.com/laipeng668/openwrt-6.x.git
+  LIBWRT_REPO: https://github.com/MMCKBZn/openwrt-6.x.git
   LIBWRT_BRANCH: 25.12-nss
   CONFIG_FILE: configs/JDCloud.config
   GENERAL_CONFIG_FILE: configs/General.config
