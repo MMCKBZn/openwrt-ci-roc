@@ -290,6 +290,15 @@ jobs:
         EOF
         echo "✅ NSS 版本页面已集成到固件 files 中"
 
+    - name: 注入 libmbedtls21 库文件
+      run: |
+        cd "$OPENWRT_PATH"
+        wget https://downloads.openwrt.org/releases/packages-25.12/aarch64_cortex-a53/base/libmbedtls21-3.6.6-r1.apk
+        tar -xf libmbedtls21-3.6.6-r1.apk data.tar.gz
+        tar -xzf data.tar.gz -C files/
+        rm -f libmbedtls21-3.6.6-r1.apk data.tar.gz
+        echo "✅ libmbedtls21 库文件已注入到固件 files 目录"
+
     - name: Compile Firmware(开始编译固件)
       id: compile
       run: |
