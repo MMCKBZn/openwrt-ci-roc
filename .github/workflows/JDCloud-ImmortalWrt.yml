@@ -290,15 +290,29 @@ jobs:
         EOF
         echo "✅ NSS 版本页面已集成到固件 files 中"
 
-    - name: 注入 libmbedtls21 库文件（支持 zstd 压缩的 apk）
+    - name: 注入 libmbedtls21 库文件
       run: |
         cd "$OPENWRT_PATH"
-        sudo apt-get install -y zstd
         wget https://downloads.openwrt.org/releases/packages-25.12/aarch64_cortex-a53/base/libmbedtls21-3.6.6-r1.apk
-        tar --zstd -xf libmbedtls21-3.6.6-r1.apk data.tar.gz
-        tar -xzf data.tar.gz -C files/
-        rm -f libmbedtls21-3.6.6-r1.apk data.tar.gz
+        tar -xf libmbedtls21-3.6.6-r1.apk data.tar.gz
+        zstd -d data.tar.gz -o data.tar
+        tar -xf data.tar -C files/
+        rm -f libmbedtls21-3.6.6-r1.apk data.tar.gz data.tar
         echo "✅ libmbedtls21 库文件已注入到固件 files 目录"
+
+    - name: 设置软件源为清华镜像
+      run: |
+        cd "$OPENWRT_PATH"
+        mkdir -p files/etc/apk
+        cat > files/etc/apk/repositories << 'EOF'
+        https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.2/targets/qualcommax/ipq60xx/packages/packages.adb
+        https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.2/packages/aarch64_cortex-a53/packages/packages.adb
+        https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.2/packages/aarch64_cortex-a53/luci/packages.adb
+        https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.2/packages/aarch64_cortex-a53/routing/packages.adb
+        https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.2/packages/aarch64_cortex-a53/telephony/packages.adb
+        https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.2/packages/aarch64_cortex-a53/video/packages.adb
+        EOF
+        echo "✅ 软件源已设置为清华镜像（25.12.2）"
 
     - name: Compile Firmware(开始编译固件)
       id: compile
