@@ -196,6 +196,8 @@ jobs:
       run: |
         cat $CONFIG_FILE $GENERAL_CONFIG_FILE > $OPENWRT_PATH/.config
         cd $OPENWRT_PATH
+        echo "CONFIG_PACKAGE_luci-app-ledtrig-rssi=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-ledtrig-switch=y" >> .config
         make defconfig
         make download -j$(nproc)
 
