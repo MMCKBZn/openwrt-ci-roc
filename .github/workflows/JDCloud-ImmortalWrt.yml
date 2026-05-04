@@ -10,8 +10,7 @@ permissions:
   contents: write
 
 env:
-  REPO_URL:
-https://github.com/MMCKBZn/immortalwrt.git
+  REPO_URL: https://github.com/MMCKBZn/immortalwrt.git
   REPO_BRANCH: openwrt-25.12
   LIBWRT_REPO: https://github.com/MMCKBZn/openwrt-6.x.git
   LIBWRT_BRANCH: 25.12-nss
