@@ -208,7 +208,6 @@ jobs:
         fi
         make defconfig
 
-    # ---------- 修复后的步骤：Docker nftables 配置 + 清理旧规则 ----------
     - name: Set Docker to nftables mode and clean legacy rules
       run: |
         cd "$OPENWRT_PATH"
@@ -290,15 +289,27 @@ jobs:
         EOF
         echo "✅ NSS 版本页面已集成到固件 files 中"
 
-    - name: 注入 libmbedtls21 库文件
+    - name: 放入 libmbedtls21.apk 并创建自安装脚本
       run: |
         cd "$OPENWRT_PATH"
-        wget https://downloads.openwrt.org/releases/packages-25.12/aarch64_cortex-a53/base/libmbedtls21-3.6.6-r1.apk
-        tar -xf libmbedtls21-3.6.6-r1.apk data.tar.gz
-        zstd -d data.tar.gz -o data.tar
-        tar -xf data.tar -C files/
-        rm -f libmbedtls21-3.6.6-r1.apk data.tar.gz data.tar
-        echo "✅ libmbedtls21 库文件已注入到固件 files 目录"
+        # 下载 apk 到 files/root
+        mkdir -p files/root
+        wget -P files/root/ https://downloads.openwrt.org/releases/packages-25.12/aarch64_cortex-a53/base/libmbedtls21-3.6.6-r1.apk
+
+        # 创建首次启动自动安装并清理的脚本
+        mkdir -p files/etc/uci-defaults
+        cat > files/etc/uci-defaults/98-install-mbedtls << 'EOF'
+        #!/bin/sh
+        # 仅在首次启动时执行，安装 libmbedtls21 并删除安装包
+        if [ -f /root/libmbedtls21-3.6.6-r1.apk ]; then
+            apk add --allow-untrusted /root/libmbedtls21-3.6.6-r1.apk && \
+            rm -f /root/libmbedtls21-3.6.6-r1.apk
+        fi
+        # 自毁此脚本
+        rm -f /etc/uci-defaults/98-install-mbedtls
+        EOF
+        chmod +x files/etc/uci-defaults/98-install-mbedtls
+        echo "✅ libmbedtls21 将在首次启动时自动安装，安装包会被自动删除"
 
     - name: 设置软件源为清华镜像
       run: |
@@ -376,7 +387,7 @@ jobs:
         body: |
           **This is OpenWrt Firmware for JDCloud**
           ### 📒 固件信息
-          - 这是开启全功能NSS的6.12内核固件，默认主题为Aurora,集成了Docker（在软件包内安装不了Docker，不知道原因）；该仓库fork于laipeng668；如果软件源配置完apk update命令报错，请看Code下的ApkUpdate.txt文件
+          - 这是开启全功能NSS的6.12内核固件，默认主题为Aurora,集成了Docker
           - 💻 这是 JDCloud 平台使用的 OpenWrt 25.12.0快照固件
           - ⚽ 固件源码: ${{ env.REPO_URL }}
           - 💝 源码分支: ${{ env.REPO_BRANCH }}
