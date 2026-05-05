@@ -198,6 +198,8 @@ jobs:
         cd $OPENWRT_PATH
         echo "CONFIG_PACKAGE_luci-app-ledtrig-rssi=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-ledtrig-switch=y" >> .config
+        # 启用 IPQ6018 PWM 驱动模块
+        echo "CONFIG_PACKAGE_kmod-pwm-ipq=y" >> .config
         make defconfig
         make download -j$(nproc)
 
@@ -241,7 +243,6 @@ jobs:
           > files/etc/rc.local
         chmod +x files/etc/rc.local
         echo "✅ 已添加 rc.local 辅助清理脚本"
-    # ---------- 结束 ----------
 
     - name: Force default WiFi SSID via uci-defaults
       run: |
@@ -328,7 +329,30 @@ jobs:
       run: |
         cd $OPENWRT_PATH
         echo -e "$(nproc) thread compile"
+
+        # 先让内核源码解压，并应用已有补丁
+        make target/linux/prepare V=s -j$(nproc) || make target/linux/prepare V=s -j1
+
+        # 定位京东云 RE-SS-01 设备树文件
+        DTS_FILE=$(find build_dir -path "*/qcom/ipq6000-re-ss-01.dts" | head -1)
+        if [ -z "$DTS_FILE" ]; then
+          echo "❌ 错误：未找到 ipq6000-re-ss-01.dts"
+          exit 1
+        fi
+        echo "=== 修改 LED 配置为 PWM 控制 ==="
+
+        # 绿色LED (GPIO 50) → PWM 通道0
+        # 匹配行首的Tab+gpios行，替换为pwms
+        sed -i $'s/^\t\tgpios = <&tlmm 50 GPIO_ACTIVE_HIGH>;/\t\tpwms = <\&pwm 0 1000000 0>;/' "$DTS_FILE"
+
+        # 蓝色LED (GPIO 35) → PWM 通道1
+        sed -i $'s/^\t\tgpios = <&tlmm 35 GPIO_ACTIVE_HIGH>;/\t\tpwms = <\&pwm 1 1000000 0>;/' "$DTS_FILE"
+
+        echo "✅ LED 已改为 PWM 控制（绿:PWM0, 蓝:PWM1）"
+
+        # 开始编译
         make -j$(nproc) V=s || make -j1 V=s
+
         if [ -z "$(find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*.ubi' \) | head -1)" ]; then
           echo "❌ 错误：未生成任何固件文件！"
           exit 1
