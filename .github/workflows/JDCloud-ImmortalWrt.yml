@@ -359,7 +359,7 @@ jobs:
         # 在 &tlmm 节点内部插入 pwm_pins 定义
         sed -i '/^&tlmm {/a\ \t\tpwm_pins: pwm-pins {\n\t\t\tmux {\n\t\t\t\tpins = "gpio50", "gpio35";\n\t\t\t\tfunction = "pwm";\n\t\t\t\tdrive-strength = <8>;\n\t\t\t\tbias-pull-down;\n\t\t\t};\n\t\t};' "$DTS_FILE"
 
-        # 在文件末尾追加完整的 &pwm 节点（将 status 和 pinctrl 都放在节点内部）
+        # 在文件末尾追加完整的 &pwm 节点
         cat >> "$DTS_FILE" << 'EOF'
 &pwm {
 	status = "okay";
