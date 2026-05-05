@@ -355,10 +355,11 @@ jobs:
         # 蓝色LED (GPIO 35) → PWM1
         sed -i $'s/^\t\tgpios = <&tlmm 35 GPIO_ACTIVE_HIGH>;/\t\tpwms = <\&pwm 1 1000000 0>;/' "$DTS_FILE"
 
-        # 在设备树末尾启用 PWM 控制器
-        echo '&pwm { status = "okay"; };' >> "$DTS_FILE"
+        # === 添加 PWM 引脚复用 (pinctrl) ===
+        sed -i '/^&tlmm {/a\ \t\tpwm_pins: pwm-pins {\n\t\t\tmux {\n\t\t\t\tpins = "gpio50", "gpio35";\n\t\t\t\tfunction = "pwm";\n\t\t\t\tdrive-strength = <8>;\n\t\t\t\tbias-pull-down;\n\t\t\t};\n\t\t};' "$DTS_FILE"
+        sed -i '/^&pwm {/a\ \t\tpinctrl-0 = <\&pwm_pins>;\n\t\tpinctrl-names = "default";' "$DTS_FILE"
 
-        echo "✅ 绿色->PWM0, 蓝色->PWM1，PWM 控制器已启用"
+        echo "✅ 绿色->PWM0, 蓝色->PWM1, pinctrl 已配置"
 
         # === 正式编译固件 ===
         make -j$(nproc) V=s || make -j1 V=s
