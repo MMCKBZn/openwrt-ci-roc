@@ -327,30 +327,40 @@ jobs:
     - name: Compile Firmware(开始编译固件)
       id: compile
       run: |
+
         cd $OPENWRT_PATH
         echo -e "$(nproc) thread compile"
 
-        # 先让内核源码解压，并应用已有补丁
+        # === 删除可能残留的坏补丁，避免编译中断 ===
+        BAD_PATCH="target/linux/qualcommax/patches-6.12/0300-arm64-dts-qcom-ipq6018-add-pwm.patch"
+        if [ -f "$BAD_PATCH" ]; then
+          rm -f "$BAD_PATCH"
+          echo "⚠️ 已移除上次残留的问题补丁: $BAD_PATCH"
+        fi
+
+        # === 内核源码解压 & 应用官方补丁 ===
         make target/linux/prepare V=s -j$(nproc) || make target/linux/prepare V=s -j1
 
-        # 定位京东云 RE-SS-01 设备树文件
+        # === 定位京东云设备树文件 ===
         DTS_FILE=$(find build_dir -path "*/qcom/ipq6000-re-ss-01.dts" | head -1)
         if [ -z "$DTS_FILE" ]; then
-          echo "❌ 错误：未找到 ipq6000-re-ss-01.dts"
+          echo "❌ 错误：未找到 ipq6000-re-ss-01.dts，停止编译"
           exit 1
         fi
-        echo "=== 修改 LED 配置为 PWM 控制 ==="
+        echo "=== 修改 LED 为 PWM 控制 ==="
 
-        # 绿色LED (GPIO 50) → PWM 通道0
-        # 匹配行首的Tab+gpios行，替换为pwms
+        # 绿色LED (GPIO 50) → PWM0
         sed -i $'s/^\t\tgpios = <&tlmm 50 GPIO_ACTIVE_HIGH>;/\t\tpwms = <\&pwm 0 1000000 0>;/' "$DTS_FILE"
 
-        # 蓝色LED (GPIO 35) → PWM 通道1
+        # 蓝色LED (GPIO 35) → PWM1
         sed -i $'s/^\t\tgpios = <&tlmm 35 GPIO_ACTIVE_HIGH>;/\t\tpwms = <\&pwm 1 1000000 0>;/' "$DTS_FILE"
 
-        echo "✅ LED 已改为 PWM 控制（绿:PWM0, 蓝:PWM1）"
+        # 在设备树末尾启用 PWM 控制器
+        echo '&pwm { status = "okay"; };' >> "$DTS_FILE"
 
-        # 开始编译
+        echo "✅ 绿色->PWM0, 蓝色->PWM1，PWM 控制器已启用"
+
+        # === 正式编译固件 ===
         make -j$(nproc) V=s || make -j1 V=s
 
         if [ -z "$(find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*.ubi' \) | head -1)" ]; then
