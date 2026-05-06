@@ -198,7 +198,7 @@ jobs:
         cd $OPENWRT_PATH
         echo "CONFIG_PACKAGE_luci-app-ledtrig-rssi=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-ledtrig-switch=y" >> .config
-        # 启用 IPQ6018 PWM 驱动模块
+        # 启用 IPQ6018 PWM 驱动模块（可选，保持无妨）
         echo "CONFIG_PACKAGE_kmod-pwm-ipq=y" >> .config
         make defconfig
         make download -j$(nproc)
@@ -327,65 +327,27 @@ jobs:
     - name: Compile Firmware(开始编译固件)
       id: compile
       run: |
-
         cd $OPENWRT_PATH
         echo -e "$(nproc) thread compile"
 
-        # === 删除可能残留的坏补丁，避免编译中断 ===
+        # 删除可能残留的坏补丁
         BAD_PATCH="target/linux/qualcommax/patches-6.12/0300-arm64-dts-qcom-ipq6018-add-pwm.patch"
         if [ -f "$BAD_PATCH" ]; then
           rm -f "$BAD_PATCH"
-          echo "⚠️ 已移除上次残留的问题补丁: $BAD_PATCH"
+          echo "⚠️ 已移除残留补丁"
         fi
 
-        # === 内核源码解压 & 应用官方补丁 ===
+        # 内核准备
         make target/linux/prepare V=s -j$(nproc) || make target/linux/prepare V=s -j1
 
-        # === 定位京东云设备树文件 ===
-        DTS_FILE=$(find build_dir -path "*/qcom/ipq6000-re-ss-01.dts" | head -1)
-        if [ -z "$DTS_FILE" ]; then
-          echo "❌ 错误：未找到 ipq6000-re-ss-01.dts，停止编译"
-          exit 1
-        fi
-        echo "=== 修改 LED 为 PWM 控制 ==="
-
-        # 绿色LED (GPIO 50) → PWM0
-        sed -i $'s/^\t\tgpios = <&tlmm 50 GPIO_ACTIVE_HIGH>;/\t\tpwms = <\&pwm 0 1000000 0>;/' "$DTS_FILE"
-
-        # 蓝色LED (GPIO 35) → PWM1
-        sed -i $'s/^\t\tgpios = <&tlmm 35 GPIO_ACTIVE_HIGH>;/\t\tpwms = <\&pwm 1 1000000 0>;/' "$DTS_FILE"
-
-        # === 在文件末尾一次性追加 pinctrl 和 PWM 控制器完整配置 ===
-        cat >> "$DTS_FILE" << 'EOF'
-
-        &tlmm {
-        	pwm_pins: pwm-pins {
-        		mux {
-        			pins = "gpio50", "gpio35";
-        			function = "pwm";
-        			drive-strength = <8>;
-        			bias-pull-down;
-        		};
-        	};
-        };
-
-        &pwm {
-        	status = "okay";
-        	pinctrl-0 = <&pwm_pins>;
-        	pinctrl-names = "default";
-        };
-        EOF
-
-        echo "✅ 绿色->PWM0, 蓝色->PWM1, pinctrl 已正确配置"
-
-        # === 正式编译固件 ===
+        # 正式编译固件（不再修改任何设备树文件）
         make -j$(nproc) V=s || make -j1 V=s
 
         if [ -z "$(find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*.ubi' \) | head -1)" ]; then
-          echo "❌ 错误：未生成任何固件文件！"
+          echo "❌ 错误：未生成固件文件"
           exit 1
         fi
-        echo "✅ 固件文件已生成"
+        echo "✅ 固件已生成"
         echo "status=success" >> $GITHUB_OUTPUT
         echo "DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
         echo "FILE_DATE=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
