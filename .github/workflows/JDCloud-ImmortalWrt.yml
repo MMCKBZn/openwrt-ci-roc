@@ -355,12 +355,20 @@ jobs:
         # 蓝色LED (GPIO 35) → PWM1
         sed -i $'s/^\t\tgpios = <&tlmm 35 GPIO_ACTIVE_HIGH>;/\t\tpwms = <\&pwm 1 1000000 0>;/' "$DTS_FILE"
 
-        # === 添加 PWM 引脚复用 (pinctrl) ===
-        # 在 &tlmm 节点内部插入 pwm_pins 定义
-        sed -i '/^&tlmm {/a\ \t\tpwm_pins: pwm-pins {\n\t\t\tmux {\n\t\t\t\tpins = "gpio50", "gpio35";\n\t\t\t\tfunction = "pwm";\n\t\t\t\tdrive-strength = <8>;\n\t\t\t\tbias-pull-down;\n\t\t\t};\n\t\t};' "$DTS_FILE"
-
-        # 在文件末尾追加完整的 &pwm 节点（注意内容缩进，确保 YAML 不报错）
+        # === 在文件末尾一次性追加 pinctrl 和 PWM 控制器完整配置 ===
         cat >> "$DTS_FILE" << 'EOF'
+
+        &tlmm {
+        	pwm_pins: pwm-pins {
+        		mux {
+        			pins = "gpio50", "gpio35";
+        			function = "pwm";
+        			drive-strength = <8>;
+        			bias-pull-down;
+        		};
+        	};
+        };
+
         &pwm {
         	status = "okay";
         	pinctrl-0 = <&pwm_pins>;
